@@ -77,7 +77,6 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/resource.h>
 #include <sys/time.h>
 #endif
-
 #ifndef likely
 #ifdef __GNUC__
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -103,7 +102,7 @@ extern unsigned int openblas_thread_timeout();
 #undef NEED_STACKATTR
 
 #define ATTRIBUTE_SIZE 128
-
+#include <abt.h>
 /* This is a thread server model implementation.  The threads are   */
 /* spawned at first access to blas library, and still remains until */
 /* destruction routine is called.  The number of threads are        */
