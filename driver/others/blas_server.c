@@ -623,9 +623,10 @@ int blas_thread_init(void){
   pthread_attr_setguardsize(&attr,  0x1000U);
   pthread_attr_setstacksize( &attr, 0x1000U);
 #endif
-
+  int argc; char **argv;
+  ABT_init(argc,argv);
   LOCK_COMMAND(&server_lock);
-
+  //ABT_init(argc,argv);
   if (!blas_server_avail){
 
     thread_timeout_env=openblas_thread_timeout();
@@ -639,7 +640,6 @@ int blas_thread_init(void){
 
       atomic_store_queue(&thread_status[i].queue, (blas_queue_t *)0);
       thread_status[i].status = THREAD_STATUS_WAKEUP;
-
       pthread_mutex_init(&thread_status[i].lock, NULL);
       pthread_cond_init (&thread_status[i].wakeup, NULL);
 
@@ -1054,7 +1054,7 @@ int BLASFUNC(blas_thread_shutdown)(void){
 #endif
 
   blas_server_avail = 0;
-
+  //ABT_finalize();
   UNLOCK_COMMAND(&server_lock);
 
   return 0;
