@@ -124,7 +124,9 @@ static unsigned long server_lock       = 0;
 #define THREAD_STATUS_SLEEP		2
 #define THREAD_STATUS_WAKEUP		4
 
-static pthread_t       blas_threads [MAX_CPU_NUMBER];
+static ABT_xstream      xstreams [MAX_CPU_NUMBER];
+static ABT_pool         pools    [MAX_CPU_NUMBER];
+static ABT_thread       blas_threads [MAX_CPU_NUMBER];
 
 typedef struct {
   blas_queue_t * volatile queue   __attribute__((aligned(ATTRIBUTE_SIZE)));
@@ -383,7 +385,7 @@ blas_queue_t *tscq;
       tscq = atomic_load_queue(&thread_status[cpu].queue);
 
 	while(!tscq) {
-	YIELDING;
+	ABT_thread_yield();
 
 	if ((unsigned int)rpcc() - last_tick > thread_timeout) {
 
@@ -612,6 +614,8 @@ int blas_thread_init(void){
   BLASLONG i;
   int ret;
   int thread_timeout_env;
+  char *thread_count=getenv("thread_count");
+  blas_num_threads=atoi(thread_count);
 #ifdef NEED_STACKATTR
   pthread_attr_t attr;
 #endif
@@ -624,9 +628,16 @@ int blas_thread_init(void){
   pthread_attr_setstacksize( &attr, 0x1000U);
 #endif
   int argc; char **argv;
-  ABT_init(argc,argv);
   LOCK_COMMAND(&server_lock);
-  //ABT_init(argc,argv);
+  ABT_init(argc,argv);
+  ABT_xstream_self(&xstreams[0]);
+  for (i = 1; i < blas_num_threads - 1 ; i++) {
+                ABT_xstream_create(ABT_SCHED_NULL, &xstreams[i]);
+        }
+  for ( i = 0; i < blas_num_threads  - 1; i++) {
+                ABT_xstream_get_main_pools(xstreams[i], 1, &pools[i]);
+        }
+
   if (!blas_server_avail){
 
     thread_timeout_env=openblas_thread_timeout();
@@ -647,8 +658,9 @@ int blas_thread_init(void){
       ret=pthread_create(&blas_threads[i], &attr,
 		     &blas_thread_server, (void *)i);
 #else
-      ret=pthread_create(&blas_threads[i], NULL,
-		     &blas_thread_server, (void *)i);
+      ABT_thread_create(pools[i],(void *)blas_thread_server, (void *)i, ABT_THREAD_ATTR_NULL,
+                     &blas_threads[i]);
+
 #endif
       if(ret!=0){
 	struct rlimit rlim;
@@ -816,7 +828,7 @@ int exec_blas_async_wait(BLASLONG num, blas_queue_t *queue){
 
 
       while(tsqq) {
-	YIELDING;
+	ABT_thread_yield();
         tsqq = atomic_load_queue(&thread_status[queue->assigned].queue);
       };
 
@@ -1041,7 +1053,12 @@ int BLASFUNC(blas_thread_shutdown)(void){
   }
 
   for(i = 0; i < blas_num_threads - 1; i++){
-    pthread_join(blas_threads[i], NULL);
+    ABT_thread_join(blas_threads[i]);
+    ABT_thread_free(&blas_threads[i]);
+  }
+   for(i = 0; i < blas_num_threads - 1; i++){
+    ABT_xstream_join(xstreams[i]);
+    ABT_xstream_free(&xstreams[i]);
   }
 
   for(i = 0; i < blas_num_threads - 1; i++){
@@ -1054,7 +1071,7 @@ int BLASFUNC(blas_thread_shutdown)(void){
 #endif
 
   blas_server_avail = 0;
-  //ABT_finalize();
+  ABT_finalize();
   UNLOCK_COMMAND(&server_lock);
 
   return 0;

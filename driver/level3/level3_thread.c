@@ -352,7 +352,7 @@ static int inner_thread(blas_arg_t *args, BLASLONG *range_m, BLASLONG *range_n, 
       /* Make sure if no one is using workspace */
       START_RPCC();
       for (i = 0; i < args -> nthreads; i++)
-	while (job[mypos].working[i][CACHE_LINE_SIZE * bufferside]) {YIELDING;};
+	while (job[mypos].working[i][CACHE_LINE_SIZE * bufferside]) {ABT_thread_yield();};
       STOP_RPCC(waiting1);
       MB;
 
@@ -421,7 +421,7 @@ static int inner_thread(blas_arg_t *args, BLASLONG *range_m, BLASLONG *range_n, 
 
 	  /* Wait until other region of B is initialized */
 	  START_RPCC();
-	  while(job[current].working[mypos][CACHE_LINE_SIZE * bufferside] == 0) {YIELDING;};
+	  while(job[current].working[mypos][CACHE_LINE_SIZE * bufferside] == 0) {ABT_thread_yield();};
 	  STOP_RPCC(waiting2);
 	  MB;
 
@@ -502,7 +502,7 @@ static int inner_thread(blas_arg_t *args, BLASLONG *range_m, BLASLONG *range_n, 
   START_RPCC();
   for (i = 0; i < args -> nthreads; i++) {
     for (js = 0; js < DIVIDE_RATE; js++) {
-      while (job[mypos].working[i][CACHE_LINE_SIZE * js] ) {YIELDING;};
+      while (job[mypos].working[i][CACHE_LINE_SIZE * js] ) {ABT_thread_yield();};
     }
   }
   STOP_RPCC(waiting3);
