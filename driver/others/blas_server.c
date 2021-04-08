@@ -631,10 +631,10 @@ int blas_thread_init(void){
   LOCK_COMMAND(&server_lock);
   ABT_init(argc,argv);
   ABT_xstream_self(&xstreams[0]);
-  for (i = 1; i < blas_num_threads - 1 ; i++) {
+  for (i = 1; i < blas_num_threads; i++) {
                 ABT_xstream_create(ABT_SCHED_NULL, &xstreams[i]);
         }
-  for ( i = 0; i < blas_num_threads  - 1; i++) {
+  for ( i = 0; i < blas_num_threads; i++) {
                 ABT_xstream_get_main_pools(xstreams[i], 1, &pools[i]);
         }
 
@@ -647,7 +647,7 @@ int blas_thread_init(void){
       thread_timeout = (1 << thread_timeout_env);
     }
 
-    for(i = 0; i < blas_num_threads - 1; i++){
+    for(i = 0; i < blas_num_threads; i++){
 
       atomic_store_queue(&thread_status[i].queue, (blas_queue_t *)0);
       thread_status[i].status = THREAD_STATUS_WAKEUP;
@@ -658,7 +658,7 @@ int blas_thread_init(void){
       ret=pthread_create(&blas_threads[i], &attr,
 		     &blas_thread_server, (void *)i);
 #else
-      ABT_thread_create(pools[i],(void *)blas_thread_server, (void *)i, ABT_THREAD_ATTR_NULL,
+      ABT_thread_create(pools[i+1],(void *)blas_thread_server, (void *)i, ABT_THREAD_ATTR_NULL,
                      &blas_threads[i]);
 
 #endif
@@ -1039,7 +1039,7 @@ int BLASFUNC(blas_thread_shutdown)(void){
 
   LOCK_COMMAND(&server_lock);
 
-  for (i = 0; i < blas_num_threads - 1; i++) {
+  for (i = 0; i < blas_num_threads; i++) {
 
 
     pthread_mutex_lock (&thread_status[i].lock);
@@ -1052,16 +1052,16 @@ int BLASFUNC(blas_thread_shutdown)(void){
 
   }
 
-  for(i = 0; i < blas_num_threads - 1; i++){
+  for(i = 0; i < blas_num_threads; i++){
     ABT_thread_join(blas_threads[i]);
     ABT_thread_free(&blas_threads[i]);
   }
-   for(i = 0; i < blas_num_threads - 1; i++){
+   for(i = 1; i < blas_num_threads; i++){
     ABT_xstream_join(xstreams[i]);
     ABT_xstream_free(&xstreams[i]);
   }
 
-  for(i = 0; i < blas_num_threads - 1; i++){
+  for(i = 0; i < blas_num_threads; i++){
     pthread_mutex_destroy(&thread_status[i].lock);
     pthread_cond_destroy (&thread_status[i].wakeup);
   }
