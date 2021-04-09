@@ -137,8 +137,8 @@ typedef struct {
 
   volatile long		 status;
 
-  pthread_mutex_t	 lock;
-  pthread_cond_t	 wakeup;
+  ABT_mutex	 lock;
+  ABT_cond	 wakeup;
 
 } thread_status_t;
 
@@ -391,7 +391,7 @@ blas_queue_t *tscq;
 
 
 	  if (!atomic_load_queue(&thread_status[cpu].queue)) {
-	    pthread_mutex_lock  (&thread_status[cpu].lock);
+	    ABT_mutex_lock  (thread_status[cpu].lock);
 	    thread_status[cpu].status = THREAD_STATUS_SLEEP;
 	    while (thread_status[cpu].status == THREAD_STATUS_SLEEP && 
 			    !atomic_load_queue(&thread_status[cpu].queue)) {
@@ -400,9 +400,9 @@ blas_queue_t *tscq;
 	      main_status[cpu] = MAIN_SLEEPING;
 #endif
 
-	      pthread_cond_wait(&thread_status[cpu].wakeup, &thread_status[cpu].lock);
+	      ABT_cond_wait(thread_status[cpu].wakeup, thread_status[cpu].lock);
 	    }
-	    pthread_mutex_unlock(&thread_status[cpu].lock);
+	    ABT_mutex_unlock(thread_status[cpu].lock);
 	  }
 
 	  last_tick = (unsigned int)rpcc();
@@ -651,8 +651,8 @@ int blas_thread_init(void){
 
       atomic_store_queue(&thread_status[i].queue, (blas_queue_t *)0);
       thread_status[i].status = THREAD_STATUS_WAKEUP;
-      pthread_mutex_init(&thread_status[i].lock, NULL);
-      pthread_cond_init (&thread_status[i].wakeup, NULL);
+      ABT_mutex_create(&thread_status[i].lock);
+      ABT_cond_create (&thread_status[i].wakeup);
 
 #ifdef NEED_STACKATTR
       ret=pthread_create(&blas_threads[i], &attr,
@@ -795,7 +795,7 @@ int exec_blas_async(BLASLONG pos, blas_queue_t *queue){
       tspq = atomic_load_queue(&thread_status[pos].queue);
 
       if ((BLASULONG)tspq > 1) {
-	pthread_mutex_lock  (&thread_status[pos].lock);
+	 ABT_mutex_lock  (thread_status[pos].lock);
 
 	if (thread_status[pos].status == THREAD_STATUS_SLEEP) {
 
@@ -806,11 +806,11 @@ int exec_blas_async(BLASLONG pos, blas_queue_t *queue){
 
 	  if (thread_status[pos].status == THREAD_STATUS_SLEEP) {
 	    thread_status[pos].status = THREAD_STATUS_WAKEUP;
-	    pthread_cond_signal(&thread_status[pos].wakeup);
+	    ABT_cond_signal(thread_status[pos].wakeup);
 	  }
 
 	}
-	  pthread_mutex_unlock(&thread_status[pos].lock);
+	  ABT_mutex_unlock  (thread_status[pos].lock);
       }
 
       current = current -> next;
@@ -951,8 +951,8 @@ void goto_set_num_threads(int num_threads) {
       atomic_store_queue(&thread_status[i].queue, (blas_queue_t *)0);
       thread_status[i].status = THREAD_STATUS_WAKEUP;
 
-      pthread_mutex_init(&thread_status[i].lock, NULL);
-      pthread_cond_init (&thread_status[i].wakeup, NULL);
+      ABT_mutex_create(&thread_status[i].lock);
+      ABT_cond_create (&thread_status[i].wakeup);
 
 #ifdef NEED_STACKATTR
       pthread_create(&blas_threads[i], &attr,
@@ -1042,13 +1042,13 @@ int BLASFUNC(blas_thread_shutdown)(void){
   for (i = 0; i < blas_num_threads; i++) {
 
 
-    pthread_mutex_lock (&thread_status[i].lock);
+    ABT_mutex_lock (thread_status[i].lock);
 
     atomic_store_queue(&thread_status[i].queue, (blas_queue_t *)-1);
     thread_status[i].status = THREAD_STATUS_WAKEUP;
-    pthread_cond_signal (&thread_status[i].wakeup);
+    ABT_cond_signal (thread_status[i].wakeup);
 
-    pthread_mutex_unlock(&thread_status[i].lock);
+    ABT_mutex_unlock(thread_status[i].lock);
 
   }
 
@@ -1062,8 +1062,8 @@ int BLASFUNC(blas_thread_shutdown)(void){
   }
 
   for(i = 0; i < blas_num_threads; i++){
-    pthread_mutex_destroy(&thread_status[i].lock);
-    pthread_cond_destroy (&thread_status[i].wakeup);
+    ABT_mutex_free(&thread_status[i].lock);
+    ABT_cond_free (&thread_status[i].wakeup);
   }
 
 #ifdef NEED_STACKATTR
